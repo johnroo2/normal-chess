@@ -1,3 +1,6 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.white-piece:hover{filter:contrast(0.5) brightness(1.15)}
+.black-piece:hover{filter:contrast(0.5) brightness(1.35)}
