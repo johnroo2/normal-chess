@@ -26,17 +26,18 @@ const moveable = (x:number, y:number, initx:number, inity:number, safety:boolean
 
 const attacked = (x:number, y:number, initx:number, inity:number, board:number[][]) => {
     let output = false
-    board.forEach((row:number[], rkey:number) => {
+
+    let clone = [...board.map((row:any[]) => [...row])]
+    
+    clone.forEach((row:number[], rkey:number) => {
         row.forEach((square:number, ckey:number) => {
-            if(captureEnemy(initx, inity, ckey, rkey, board)){ //if opposite sides
+            if(captureEnemy(ckey, rkey, initx, inity, clone) && square !== 0){ //if opposite sides
                 const code = Math.abs(square)
                 if(code !== 10){ //if not a king (avoid recursion)
-                    const occupies = pieceData[code].movement(ckey, rkey, board, {white: square > 0, safety:false})
+                    const occupies = pieceData[code].movement(ckey, rkey, clone, 
+                        {white: square > 0, safety:false, 
+                            pawn_mirage: true})
                     if(occupies.filter((pos:number[]) => {return pos[0] === x && pos[1] === y}).length > 0){
-                        // console.log(ckey)
-                        // console.log(rkey)
-                        // console.log(board)
-                        // console.log(occupies)
                         output = true
                     }
                 }
@@ -55,19 +56,23 @@ const endangers = (x:number, y:number, initx:number, inity:number, safety:boolea
     if(!safety){
         return false
     }
-    //if(pieceData[board[inity][initx]]?.img_string){console.log(`${pieceData[board[inity][initx]].img_string} to ${x}, ${y}`)}
-    //get king coords
     let px = -1; let py = -1;
-    board.forEach((row:number[], rkey:number) => {
-        row.forEach((square:number, ckey:number) => {
-            const code = Math.abs(square)
-            if(!captureEnemy(initx, inity, ckey, rkey, board)){ //same side
-                if(code === 10){
-                    px = ckey; py = rkey
+    if(Math.abs(board[inity][initx]) === 10){ //adjust king movement
+        px = x; py = y;
+    }
+    else{
+        //get king coords
+        board.forEach((row:number[], rkey:number) => {
+            row.forEach((square:number, ckey:number) => {
+                const code = Math.abs(square)
+                if(!captureEnemy(initx, inity, ckey, rkey, board)){ //same side
+                    if(code === 10){
+                        px = ckey; py = rkey
+                    }
                 }
-            }
+            })
         })
-    })
+    }
     // no king?
     if(px < 0 || py < 0){
         console.log("no king?")
@@ -86,16 +91,16 @@ const endangers = (x:number, y:number, initx:number, inity:number, safety:boolea
 function pawnMovement(x:number, y:number, board:number[][], props:any){
     let output:number[][] = [];
     if(props.white){
-        if(props.firstmove && moveable(x, y-1, x, y, props.safety, board) && moveable(x, y-2, x, y, props.safety, board)){output.push([x, y-2])}
-        if(occupied(x-1, y-1, board) && insertable(x-1, y-1, x, y, props.safety, board)){output.push([x-1, y-1])}
-        if(occupied(x+1, y-1, board) && insertable(x+1, y-1, x, y, props.safety, board)){output.push([x+1, y-1])}
-        if(moveable(x, y-1, x, y, props.safety, board)){output.push([x, y-1])}
+        if(!props.pawn_mirage && props.firstmove && moveable(x, y-1, x, y, props.safety, board) && moveable(x, y-2, x, y, props.safety, board)){output.push([x, y-2])}
+        if(!props.pawn_mirage && moveable(x, y-1, x, y, props.safety, board)){output.push([x, y-1])}
+        if(props.pawn_mirage || (occupied(x-1, y-1, board) && insertable(x-1, y-1, x, y, props.safety, board))){output.push([x-1, y-1])}
+        if(props.pawn_mirage || (occupied(x+1, y-1, board) && insertable(x+1, y-1, x, y, props.safety, board))){output.push([x+1, y-1])}
     }
     else{
-        if(props.firstmove && moveable(x, y+1, x, y, props.safety, board) && moveable(x, y+2, x, y, props.safety, board)){output.push([x, y+2])}
-        if(occupied(x-1, y+1, board) && insertable(x-1, y+1, x, y, props.safety, board)){output.push([x-1, y+1])}
-        if(occupied(x+1, y+1, board) && insertable(x+1, y+1, x, y, props.safety, board)){output.push([x+1, y+1])}
-        if(moveable(x, y+1, x, y, props.safety, board)){output.push([x, y+1])}
+        if(!props.pawn_mirage && props.firstmove && moveable(x, y+1, x, y, props.safety, board) && moveable(x, y+2, x, y, props.safety, board)){output.push([x, y+2])}
+        if(!props.pawn_mirage && moveable(x, y+1, x, y, props.safety, board)){output.push([x, y+1])}
+        if(props.pawn_mirage || (occupied(x-1, y+1, board) && insertable(x-1, y+1, x, y, props.safety, board))){output.push([x-1, y+1])}
+        if(props.pawn_mirage || (occupied(x+1, y+1, board) && insertable(x+1, y+1, x, y, props.safety, board))){output.push([x+1, y+1])}
     }
     return [...output]
 }
@@ -116,14 +121,14 @@ function knightMovement(x:number, y:number, board:number[][], props:any){
 //TODO: CASTLING
 function kingMovement(x:number, y:number, board:number[][], props:any){
     let output:number[][] = [];
-    if(insertable(x-1, y-1, x, y, props.safety, board) && !attacked(x-1, y-1, x, y, board)){output.push([x-1, y-1])}
-    if(insertable(x-1, y, x, y, props.safety, board) && !attacked(x-1, y, x, y, board)){output.push([x-1, y])}
-    if(insertable(x-1, y+1, x, y, props.safety, board) && !attacked(x-1, y+1, x, y, board)){output.push([x-1, y+1])}
-    if(insertable(x, y-1, x, y, props.safety, board) && !attacked(x, y-1, x, y, board)){output.push([x, y-1])}
-    if(insertable(x, y+1, x, y, props.safety, board) && !attacked(x, y+1, x, y, board)){output.push([x, y+1])}
-    if(insertable(x+1, y-1, x, y, props.safety, board) && !attacked(x+1, y-1, x, y, board)){output.push([x+1, y-1])}
-    if(insertable(x+1, y, x, y, props.safety, board) && !attacked(x+1, y, x, y, board)){output.push([x+1, y])}
-    if(insertable(x+1, y+1, x, y, props.safety, board) && !attacked(x+1, y+1, x, y, board)){output.push([x+1, y+1])}
+    if(insertable(x-1, y-1, x, y, props.safety, board)){output.push([x-1, y-1])}
+    if(insertable(x-1, y, x, y, props.safety, board)){output.push([x-1, y])}
+    if(insertable(x-1, y+1, x, y, props.safety, board)){output.push([x-1, y+1])}
+    if(insertable(x, y-1, x, y, props.safety, board)){output.push([x, y-1])}
+    if(insertable(x, y+1, x, y, props.safety, board)){output.push([x, y+1])}
+    if(insertable(x+1, y-1, x, y, props.safety, board)){output.push([x+1, y-1])}
+    if(insertable(x+1, y, x, y, props.safety, board)){output.push([x+1, y])}
+    if(insertable(x+1, y+1, x, y, props.safety, board)){output.push([x+1, y+1])}
     if(!props.displaced){
         if(moveable(x+1, y, x, y, props.safety, board) && moveable(x+2, y, x, y, props.safety, board) && 
         !attacked(x+1, y, x, y, board) && !attacked(x+2, y, x, y, board) && 
@@ -146,36 +151,36 @@ function bishopMovement(x:number, y:number, board:number[][], props:any){
     function topLeft(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                topLeft(x-1, y-1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            topLeft(x-1, y-1)
         }
         return
     }
     function topRight(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                topRight(x+1, y-1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            topRight(x+1, y-1)
         }
         return
     }
     function bottomLeft(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                bottomLeft(x-1, y+1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            bottomLeft(x-1, y+1)
         }
         return
     }
     function bottomRight(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                bottomRight(x+1, y+1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            bottomRight(x+1, y+1)
         }
         return
     }
@@ -190,36 +195,36 @@ function rookMovement(x:number, y:number, board:number[][], props:any){
     function up(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                up(x, y-1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            up(x, y-1)
         }
         return
     }
     function down(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                down(x, y+1)
-            }
+        }
+        if(!blocked(x, y, board)){
+            down(x, y+1)
         }
         return
     }
     function left(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                left(x-1, y)
-            }
+        }
+        if(!blocked(x, y, board)){
+            left(x-1, y)
         }
         return
     }
     function right(x:number, y:number){
         if(insertable(x, y, initx, inity, props.safety, board)){
             output.push([x, y])
-            if(moveable(x, y, initx, inity, props.safety, board)){
-                right(x+1, y)
-            }
+        }
+        if(!blocked(x, y, board)){
+            right(x+1, y)
         }
         return
     }
@@ -234,6 +239,7 @@ function queenMovement(x:number, y:number, board:number[][], props:any){
 export const pieceData: { [key: number]: any } = {
     1: {
         img_string: "pawn",
+        prefix: "",
         movement:pawnMovement,
         base:{
             name: "pawn",
@@ -242,6 +248,7 @@ export const pieceData: { [key: number]: any } = {
     },
     2: {
         img_string: "knight",
+        prefix: "N",
         movement:knightMovement,
         base:{
             name: "knight",
@@ -250,6 +257,7 @@ export const pieceData: { [key: number]: any } = {
     },
     3: {
         img_string: "bishop",
+        prefix: "B",
         movement:bishopMovement,
         base:{
             name: "bishop",
@@ -258,6 +266,7 @@ export const pieceData: { [key: number]: any } = {
     },
     5: {
         img_string: "rook",
+        prefix: "R",
         movement:rookMovement,
         base:{
             name: "rook",
@@ -266,6 +275,7 @@ export const pieceData: { [key: number]: any } = {
     },
     9: {
         img_string: "queen",
+        prefix: "Q",
         movement:queenMovement,
         base:{
             name: "queen",
@@ -274,6 +284,7 @@ export const pieceData: { [key: number]: any } = {
     },
     10:{
         img_string: "king",
+        prefix: "K",
         movement:kingMovement,
         base:{
             name: "king",
