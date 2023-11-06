@@ -4,6 +4,7 @@ export const boardConfig = {
     promotionSize: "65px",
     paletteSize: "32px",
     text1: "22px",
+    text2: "28px",
     defaultDisplay: [
         [-5, -2, -3, -9, -10, -3, -2, -5],
         [-1, -1, -1, -1, -1, -1, -1, -1],
@@ -13,6 +14,16 @@ export const boardConfig = {
         [0, 0, 0, 0, 0, 0, 0, 0],
         [1, 1, 1, 1, 1, 1, 1, 1],
         [5, 2, 3, 9, 10, 3, 2, 5]
+    ],
+    blank: [
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0],
     ],
     columns: ["a", "b", "c", "d", "e", "f", "g", "h"]
 }
@@ -37,6 +48,10 @@ export const boardThemes: { [key: string]: any } = {
     red:{
         light:"#fefce8",
         alt:"#fca5a5"
+    },
+    pink:{
+        light: "#ffe0ea",
+        alt:"#dfa0c8"
     }
 };
 

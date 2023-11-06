@@ -25,8 +25,7 @@ const moveable = (x:number, y:number, initx:number, inity:number, safety:boolean
 }
 
 const attacked = (x:number, y:number, initx:number, inity:number, board:number[][]) => {
-    let output = false
-
+    let output = 0
     let clone = [...board.map((row:any[]) => [...row])]
     
     clone.forEach((row:number[], rkey:number) => {
@@ -38,12 +37,12 @@ const attacked = (x:number, y:number, initx:number, inity:number, board:number[]
                         {white: square > 0, safety:false, 
                             pawn_mirage: true})
                     if(occupies.filter((pos:number[]) => {return pos[0] === x && pos[1] === y}).length > 0){
-                        output = true
+                        output += 1
                     }
                 }
                 else{
                     if(Math.abs(ckey-x) <= 1 && Math.abs(rkey-y) <= 1){
-                        output = true
+                        output += 1
                     }
                 }
             }
@@ -83,11 +82,9 @@ const endangers = (x:number, y:number, initx:number, inity:number, safety:boolea
     clone[y][x] = board[inity][initx]
     clone[inity][initx] = board[y][x]
     if(board[y][x] !== 0){clone[inity][initx] = 0}
-    return attacked(px, py, px, py, clone) //determine if king is safe
+    return attacked(px, py, px, py, clone) >= 1 //determine if king is safe
 }
 
-//TODO: PROMOTION
-//TODO: EN PASSANT
 function pawnMovement(x:number, y:number, board:number[][], props:any){
     let output:number[][] = [];
     if(props.white){
@@ -95,14 +92,31 @@ function pawnMovement(x:number, y:number, board:number[][], props:any){
         if(!props.pawn_mirage && moveable(x, y-1, x, y, props.safety, board)){output.push([x, y-1])}
         if(props.pawn_mirage || (occupied(x-1, y-1, board) && insertable(x-1, y-1, x, y, props.safety, board))){output.push([x-1, y-1])}
         if(props.pawn_mirage || (occupied(x+1, y-1, board) && insertable(x+1, y-1, x, y, props.safety, board))){output.push([x+1, y-1])}
+
+        //passant
+        if(props.passants){
+            props.passants.forEach((pos:number[]) => {
+            if(pos[0] === x-1 && pos[1] === y && moveable(x-1, y-1, x, y, props.safety, board) 
+            && captureEnemy(x-1, y, x, y, board)){output.push([x-1, y-1])}
+            if(pos[0] === x+1 && pos[1] === y && moveable(x+1, y-1, x, y, props.safety, board) 
+            && captureEnemy(x+1, y, x, y, board)){output.push([x+1, y-1])}
+        })}
     }
     else{
         if(!props.pawn_mirage && props.firstmove && moveable(x, y+1, x, y, props.safety, board) && moveable(x, y+2, x, y, props.safety, board)){output.push([x, y+2])}
         if(!props.pawn_mirage && moveable(x, y+1, x, y, props.safety, board)){output.push([x, y+1])}
         if(props.pawn_mirage || (occupied(x-1, y+1, board) && insertable(x-1, y+1, x, y, props.safety, board))){output.push([x-1, y+1])}
         if(props.pawn_mirage || (occupied(x+1, y+1, board) && insertable(x+1, y+1, x, y, props.safety, board))){output.push([x+1, y+1])}
+
+        if(props.passants){
+            props.passants.forEach((pos:number[]) => {
+            if(pos[0] === x-1 && pos[1] === y && moveable(x-1, y+1, x, y, props.safety, board) 
+            && captureEnemy(x-1, y, x, y, board)){output.push([x-1, y+1])}
+            if(pos[0] === x+1 && pos[1] === y && moveable(x+1, y+1, x, y, props.safety, board) 
+            && captureEnemy(x+1, y, x, y, board)){output.push([x+1, y+1])}
+        })}
     }
-    return [...output]
+    return [...new Set(output)]
 }
 
 function knightMovement(x:number, y:number, board:number[][], props:any){
@@ -131,12 +145,12 @@ function kingMovement(x:number, y:number, board:number[][], props:any){
     if(insertable(x+1, y+1, x, y, props.safety, board)){output.push([x+1, y+1])}
     if(!props.displaced){
         if(moveable(x+1, y, x, y, props.safety, board) && moveable(x+2, y, x, y, props.safety, board) && 
-        !attacked(x+1, y, x, y, board) && !attacked(x+2, y, x, y, board) && 
+        !(attacked(x+1, y, x, y, board) >= 1) && !(attacked(x+2, y, x, y, board) >= 1) && 
         (board[y][7] === props.white ? 5 : -5)){
             output.push([x+2, y])
         } //kingside
         if(moveable(x-1, y, x, y, props.safety, board) && moveable(x-2, y, x, y, props.safety, board) && 
-        !attacked(x-1, y, x, y, board) && !attacked(x-2, y, x, y, board) && 
+        !(attacked(x-1, y, x, y, board) >= 1) && !(attacked(x-2, y, x, y, board) >= 1) && 
         (board[y][0] === props.white ? 5 : -5)){
             output.push([x-2, y])
         } //queenside
@@ -236,6 +250,81 @@ function queenMovement(x:number, y:number, board:number[][], props:any){
     return [...bishopMovement(x,y,board,props), ...rookMovement(x,y,board,props)]
 }
 
+export const sourcePotential = (x:number, y:number, initx:number, inity:number, columns:string[], board:number[][]) => {
+    const output:number[][] = []
+    let clone = [...board.map((row:any[]) => [...row])]
+
+    const source = Math.abs(clone[inity][initx])
+    
+    clone.forEach((row:number[], rkey:number) => {
+        row.forEach((square:number, ckey:number) => {
+            if(!captureEnemy(initx, inity, ckey, rkey, board) && square !== 0){ //if same sides
+                const code = Math.abs(square)
+                if(code !== 10){ //if not a king (avoid recursion)
+                    const occupies = pieceData[code].movement(ckey, rkey, clone, 
+                        {white: square > 0, safety:false, 
+                            pawn_mirage: true})
+                    if(occupies.filter((pos:number[]) => {return pos[0] === x && pos[1] === y}).length > 0){
+                        if(code === source){output.push([ckey, rkey])}
+                    }
+                }
+                else{
+                    if(Math.abs(ckey-x) <= 1 && Math.abs(rkey-y) <= 1){
+                        if(code === source){output.push([ckey, rkey])}
+                    }
+                }
+            }
+        })
+    })
+
+    if(output.length <= 1){return ""}
+    let sameColumn = true
+    const level = output[0][0]
+    output.forEach((pair:number[]) => {
+        if(pair[0] !== level){sameColumn = false}
+    })
+    if(sameColumn){ //return the relevant row if columns indistinguishbale
+        return `${y}`
+    }
+    else{ //otherwise only indicate column
+        return `${columns[initx]}`
+    }
+}
+
+export const inCheck = (board:number[][], checks:number) => {
+    let output = 0
+    board.forEach((row:number[], rkey:number) => {
+        row.forEach((square:number, ckey:number) => {
+            const code = Math.abs(square)
+            if(code === 10){
+                const attack = attacked(ckey, rkey, ckey, rkey, board)
+                if(attack > 0){output += attack}
+            }
+        })
+    })
+    return output >= checks
+}
+
+export const inStalemate = (board:number[][], white:boolean) => {
+    let output = true
+    board.forEach((row:number[], rkey:number) => {
+        row.forEach((square:number, ckey:number) => {
+            const code = Math.abs(square)
+            if((white ? square : -square) > 0){
+                if(pieceData[code].movement(ckey, rkey, board, {
+                    white: white,
+                    safety: true,
+                }).length > 0){
+                    output = false
+                }
+            }
+        })
+    })
+    return output
+}
+
+export const inCheckmate = (board:number[][], white:boolean) => inCheck(board, 1) && inStalemate(board, white)
+
 export const pieceData: { [key: number]: any } = {
     1: {
         img_string: "pawn",
@@ -244,6 +333,7 @@ export const pieceData: { [key: number]: any } = {
         base:{
             name: "pawn",
             firstmove: true,
+            passantmove: false
         }
     },
     2: {
