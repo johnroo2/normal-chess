@@ -21,14 +21,18 @@ interface Props{
     setGameState:React.Dispatch<React.SetStateAction<string>>
     pastDisplays:number[][]
     setPastDisplays:React.Dispatch<React.SetStateAction<number[][]>>
+    boardSizes: any
+    setBoardSizes: React.Dispatch<React.SetStateAction<any>>
 }
 
 export default function Board({theme, displayBoard, setDisplayBoard, board, setBoard, 
-    turn, setTurn, setMoveList, flipActive, setGameState, pastDisplays, setPastDisplays}:Props){
+    turn, setTurn, setMoveList, flipActive, setGameState, pastDisplays, setPastDisplays, boardSizes,}:Props){
     // setTheme,
     // setFlipActive,
     // moveList, 
-    // gameState}:Props){
+    // gameState,
+    // setBoardSizes}:Props){
+    
     const [pieceMotion, setPieceMotion] = useState<{arr:number[][], source:number[]}>({arr:[], source: []})
     const [promotion, setPromotion] = useState<{white:boolean, init:number, position:number}>({white:true, init: -1, position:-1})
 
@@ -227,6 +231,7 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                 white={promotion.white} 
                 xpos={promotion.position} 
                 ypos={0}
+                boardSizes={boardSizes}
                 handlePromotion={handlePromotion}/>
             </div>}
             {(!flipActive || turn % 2 == 0 ? displayBoard : [...displayBoard].reverse()).map((row, rkey) => 
@@ -238,8 +243,8 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                             <div className={`relative border-[1px] transition-colors duration-500 border-neutral-700`} key={ckey}
                             style={{
                                 backgroundColor: (x+y) % 2 == 0 ? boardThemes[theme].light : boardThemes[theme].alt,
-                                width: boardConfig.tileSize,
-                                height: boardConfig.tileSize
+                                width: `${boardSizes.tileSize}px`,
+                                height: `${boardSizes.tileSize}px`
                             }}>
                                 {pos !== 0 &&
                                 <div className="absolute w-full h-full top-0 left-0 bg-transparent z-[5]">

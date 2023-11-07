@@ -1,10 +1,4 @@
-
 export const boardConfig = {
-    tileSize: "80px",
-    promotionSize: "65px",
-    paletteSize: "32px",
-    text1: "22px",
-    text2: "28px",
     defaultDisplay: [
         [-5, -2, -3, -9, -10, -3, -2, -5],
         [-1, -1, -1, -1, -1, -1, -1, -1],
