@@ -11,7 +11,7 @@ export default function repetition(arrays:number[][]){
     }
   
     for (let val of [...occurrences.values()]) {
-        if (val >= 3) {
+        if (val >= 4) {
             return true
         }
     }

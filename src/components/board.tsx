@@ -4,6 +4,8 @@ import { pieceData, inCheck, inStalemate, inCheckmate, sourcePotential } from ".
 import repetition from "../helpers/repetitionChecker"
 import Promotion from "./promotion"
 
+import computerService from "../services"
+
 interface Props{
     theme:string
     setTheme:React.Dispatch<React.SetStateAction<string>>
@@ -23,18 +25,46 @@ interface Props{
     setPastDisplays:React.Dispatch<React.SetStateAction<number[][]>>
     boardSizes: any
     setBoardSizes: React.Dispatch<React.SetStateAction<any>>
+    mode:string
+    setMode:React.Dispatch<React.SetStateAction<string>> 
 }
 
 export default function Board({theme, displayBoard, setDisplayBoard, board, setBoard, 
-    turn, setTurn, setMoveList, flipActive, setGameState, pastDisplays, setPastDisplays, boardSizes,}:Props){
+    turn, setTurn, setMoveList, flipActive, setGameState, pastDisplays, setPastDisplays, boardSizes,mode,}:Props){
     // setTheme,
     // setFlipActive,
     // moveList, 
     // gameState,
+    // setMode,
     // setBoardSizes}:Props){
     
     const [pieceMotion, setPieceMotion] = useState<{arr:number[][], source:number[]}>({arr:[], source: []})
     const [promotion, setPromotion] = useState<{white:boolean, init:number, position:number}>({white:true, init: -1, position:-1})
+
+    //TODO: 50 move rule
+    //TODO: Insufficient Material
+    const sendFen = async() => {
+        try{
+            const passants = getPassants()
+            const response = await computerService.sendFen(displayBoard, mode == 'white' ? 'b' : 'w', 
+            'KQkq', passants.length > 0 ? `${boardConfig.columns[passants[0][0]]}${passants[0][1]}` : '-', 0, 
+            turn % 2 == 0 ? turn/2 : (turn-1)/2)
+
+            console.log(response)
+            handleComputerResponse(response.prediction)
+        }
+        catch(err){
+            console.log(err)
+        }
+    }
+
+    const handleComputerResponse = (response:{drop:any, from_square:number, promotion:number, to_square:number}) => {
+        const inity = 7-Math.floor(response.from_square/8)
+        const initx = response.from_square % 8
+        const y = 7-Math.floor(response.to_square/8)
+        const x = response.to_square % 8
+        handleMove(x, y, initx, inity)
+    }
 
     const getPassants = () => {
         const output:number[][] = []
@@ -54,11 +84,16 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
             white: displayBoard[y][x] > 0,
             safety: true,
             passants: getPassants(),
+            kingside_displaced: displayBoard[y][x] > 0 ? 
+                !board[7][7] || board[7][7].name !== "rook" || board[7][7].displaced : 
+                !board[0][7] || board[0][7].name !== "rook" || board[0][7].displaced,
+            queenside_displaced: displayBoard[y][x] > 0 ? 
+                !board[7][0] || board[7][0].name !== "rook" || board[7][0].displaced : 
+                !board[0][0] || board[0][0].name !== "rook" || board[0][0].displaced,
             ...board[y][x]
         }), source: [x, y]})
     }
 
-    //TODO: THREEFOLD REPETITION
     const checkStatus = (board:any) => {
         if(inCheckmate(board, true)){
             setGameState("checkmate black")
@@ -81,16 +116,17 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
         return ""
     }
 
-    const handlePromotion = (output:number) => {
-        const initx = promotion.init;
-        const x = promotion.position; const y = promotion.white ? 0 : 7;
+    const handlePromotion = (output:number, ai:boolean=false, params:any=undefined) => {
+        const initx = ai ? params.init : promotion.init;
+        const x = ai ? params.to : promotion.position; 
+        const y = ai ? (params.white ? 0 : 7) : (promotion.white ? 0 : 7);
         const targetcode = Math.abs(displayBoard[y][x]);
 
         let newDisplay:number[][] = [];
 
         setDisplayBoard((prev) => {
             let clone:any[] = [...prev.map((row:number[]) => [...row])]
-            clone[y][x] = promotion.white ? output : -output; 
+            clone[y][x] = ai ? (params.white ? output : -output) : (promotion.white ? output : -output); 
             newDisplay = [...clone.map((row:number[]) => [...row])]
             setPastDisplays(prev => [...prev, [].concat(...clone)])
             return clone
@@ -100,10 +136,12 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
             clone[y][x] = {...pieceData[output].base, promoted:true};
             return clone
         })
+        console.log(newDisplay)
         setMoveList((prev) => [...prev, `${boardConfig.columns[initx]}${
             targetcode !== 0 ? `x${boardConfig.columns[x]}` : ""}${8-y}${`=${pieceData[output].prefix}`}
             ${checkStatus(newDisplay)}`])
         setPromotion({white:true, init:-1, position:-1})
+        setTurn(prev => prev+1)
     }
 
     const handleMove = async(x:number, y:number, initx:number, inity:number) => {
@@ -159,6 +197,7 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                 return square
             })])]
             if(objcode === 1){passantClone[y][x] = {...passantClone[y][x], passantmove:passantClone[y][x].firstmove, firstmove:false}} //pawn firstmove
+            if(objcode === 5){passantClone[y][x] = {...passantClone[y][x], displaced:true}} //rook displacement
             if(objcode === 10){passantClone[y][x] = {...passantClone[y][x], displaced:true}} //king displacement
             if(objcode === 10 && Math.abs(x-initx) >= 2){ //castle
                 if(x > initx){passantClone[y][5] = prev[y][7]; passantClone[y][7] = prev[y][5]} //kingside
@@ -167,8 +206,30 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
             return passantClone
         })
 
-        setTurn((prev) => prev + 1)
         setPieceMotion({arr:[], source:[]})
+
+        if(objcode === 1){ //promotion
+            if(displayBoard[inity][initx] > 0){ //white
+                if(mode === "black" && y === 0){
+                    handlePromotion(9, true, {init:initx, to:x, white:true})
+                    return
+                }
+                else if(y === 0){
+                    setPromotion({white:true, init:initx, position:x})
+                    return
+                }
+            }
+            else{ //black
+                if(mode === "white" && y === 7){
+                    handlePromotion(9, true, {init:initx, to:x, white:false})
+                    return
+                }
+                if(y === 7){
+                    setPromotion({white:false, init:initx, position:x})
+                    return
+                }
+            }
+        }
 
         const isCapture = () => {
             if(objcode === 1){
@@ -190,15 +251,6 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
             }
             return targetcode !== 0 ? "x" : ""
         }
-
-        if(objcode === 1){ //promotion
-            if(displayBoard[inity][initx] > 0){ //white
-                if(y === 0){setPromotion({white:true, init:initx, position:x});return}
-            }
-            else{ //black
-                if(y === 7){setPromotion({white:false, init:initx, position:x});return}
-            }
-        }
         
         const moveInsert = () => {
             if(objcode === 10 && Math.abs(x-initx) >= 2){
@@ -213,6 +265,7 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                     boardConfig.columns, displayBoard)}${isCapture()}${boardConfig.columns[x]}${8-y}${checkStatus(newDisplay)}`
             }
         }
+        setTurn(prev => prev+1)
         setMoveList((prev) => [...prev, `${moveInsert()}`])
     }
 
@@ -221,6 +274,23 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
             setGameState("threefold")
         }
     }, [pastDisplays])
+
+    useEffect(() => {
+        if(turn === -1){
+            setTurn(0)
+            return
+        }
+        if(turn >= 0){
+            if(mode === 'white' && turn % 2 == 1){
+                sendFen();
+            }
+            else if(mode === 'black' && turn % 2 == 0){
+                sendFen();
+            }
+        }
+    }, [turn])
+
+    const whiteside = () => mode !== "black" && (!flipActive || turn % 2 == 0) 
 
     return(
         <div className="relative flex flex-col border-2 border-neutral-700 w-min">
@@ -234,11 +304,11 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                 boardSizes={boardSizes}
                 handlePromotion={handlePromotion}/>
             </div>}
-            {(!flipActive || turn % 2 == 0 ? displayBoard : [...displayBoard].reverse()).map((row, rkey) => 
+            {(whiteside() ? displayBoard : [...displayBoard].reverse()).map((row, rkey) => 
                 <div className="flex flex-row" key={rkey}>
-                    {(!flipActive || turn % 2 == 0 ? row : [...row].reverse()).map((pos, ckey) => {
-                        let x = !flipActive || turn % 2 == 0 ? ckey : 7-ckey;
-                        let y = !flipActive || turn % 2 == 0 ? rkey : 7-rkey;
+                    {(whiteside() ? row : [...row].reverse()).map((pos, ckey) => {
+                        let x = whiteside() ? ckey : 7-ckey;
+                        let y = whiteside() ? rkey : 7-rkey;
                         return(
                             <div className={`relative border-[1px] transition-colors duration-500 border-neutral-700`} key={ckey}
                             style={{
@@ -252,14 +322,14 @@ export default function Board({theme, displayBoard, setDisplayBoard, board, setB
                                     <img src={`/assets/images/light-pieces/l${pieceData[pos].img_string}.png`}
                                     className="w-full h-full white-piece"
                                     onClick={() => {
-                                        if(turn % 2 == 0){
+                                        if(turn % 2 == 0 && (mode === "multi" || mode === "white")){
                                             handlePieceClick(x, y)
                                         }
                                     }}/>:
                                     <img src={`/assets/images/dark-pieces/d${pieceData[-pos].img_string}.png`}
                                     className="w-full h-full black-piece"
                                     onClick={() => {
-                                        if(turn % 2 == 1){
+                                        if(turn % 2 == 1 && (mode === "multi" || mode === "black")){
                                             handlePieceClick(x, y)
                                         }
                                     }}/>}

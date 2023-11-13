@@ -147,12 +147,16 @@ function kingMovement(x:number, y:number, board:number[][], props:any){
         if(moveable(x+1, y, x, y, props.safety, board) && moveable(x+2, y, x, y, props.safety, board) && 
         !(attacked(x+1, y, x, y, board) >= 1) && !(attacked(x+2, y, x, y, board) >= 1) && 
         (board[y][7] === props.white ? 5 : -5)){
-            output.push([x+2, y])
+            if(!props.kingside_displaced){
+                output.push([x+2, y])
+            }
         } //kingside
         if(moveable(x-1, y, x, y, props.safety, board) && moveable(x-2, y, x, y, props.safety, board) && 
         !(attacked(x-1, y, x, y, board) >= 1) && !(attacked(x-2, y, x, y, board) >= 1) && 
         (board[y][0] === props.white ? 5 : -5)){
-            output.push([x-2, y])
+            if(!props.queenside_displaced){
+                output.push([x-2, y])
+            }
         } //queenside
     }
     return [...output]
@@ -360,6 +364,7 @@ export const pieceData: { [key: number]: any } = {
         movement:rookMovement,
         base:{
             name: "rook",
+            displaced:false,
             promoted: false
         }
     },
@@ -379,6 +384,8 @@ export const pieceData: { [key: number]: any } = {
         base:{
             name: "king",
             displaced: false,
+            // kingside: true,
+            // queenside: true,
         }
     }
 };

@@ -11,7 +11,6 @@ import useWindowSize from "../hooks/useWindowSize"
 import { MdComputer } from "react-icons/md"
 import { BsFillPeopleFill } from "react-icons/bs"
 import { PiArrowsDownUp } from "react-icons/pi"
-import { HiOutlineRefresh } from "react-icons/hi"
 import { AiOutlineHome } from "react-icons/ai"
 import { ImBlocked } from "react-icons/im"
 
@@ -23,16 +22,19 @@ export default function Play(){
     const [board, setBoard] = useState<any[][]>(convert(boardConfig.defaultDisplay))
     const [boardSizes, setBoardSizes] = useState<any>(null)
     const [pastDisplays, setPastDisplays] = useState<number[][]>([[].concat(...boardConfig.defaultDisplay as any[])])
-    const [turn, setTurn] = useState<number>(0)
+    const [turn, setTurn] = useState<number>(-1)
     const [moveList, setMoveList] = useState<string[]>([]) 
     const [flipActive, setFlipActive] = useState<boolean>(false)
 
     const [gameState, setGameState] = useState<string>("start")
+    const [open, setOpen] = useState<boolean>(false)
+    const [mode, setMode] = useState<string>("")
 
     const reset = () => {
         setDisplayBoard(boardConfig.defaultDisplay)
         setBoard(convert(boardConfig.defaultDisplay))
-        setTurn(0)
+        setTurn(-2)
+        setMode("")
         setMoveList([])
         setPastDisplays([[].concat(...boardConfig.defaultDisplay as any[])])
     }
@@ -51,11 +53,17 @@ export default function Play(){
 
     const props = { theme, setTheme, displayBoard, setDisplayBoard, board, setBoard, turn, setTurn, 
         moveList, setMoveList, flipActive, setFlipActive, gameState, setGameState, pastDisplays, setPastDisplays,
-        boardSizes, setBoardSizes };
+        boardSizes, setBoardSizes, mode, setMode };
 
     useEffect(() => {
         setBoardSizes(retrieveSizes(size.height/10))
     }, [size])
+
+    useEffect(() => {
+        if(mode !== "white" && mode !== "black" && flipActive){
+            setFlipActive(false)
+        }
+    }, [mode])
 
     if(!boardSizes){
         return
@@ -72,7 +80,7 @@ export default function Play(){
                         gap: boardSizes.tileSize * 0.1
                     }}>
                         {boardColors.map((key, index) => 
-                        <button key={index} className="rounded-full border-neutral-700 hover:scale-[1.2] transition-all duration-300"
+                        <button key={index} className="rounded-full border-neutral-700 hover:scale-[1.2] transition-colors duration-300"
                         style={{
                             backgroundColor: boardThemes[key].alt,
                             width: boardSizes.paletteSize,
@@ -86,7 +94,7 @@ export default function Play(){
                     style={{
                         gap: boardSizes.tileSize * 0.1
                     }}>
-                        <div className={`border-2 border-neutral-700 ${turn % 2 === 0 ? "bg-neutral-100" : "bg-neutral-700"} transition-all duration-300`}
+                        <div className={`border-2 border-neutral-700 ${turn % 2 === 0 ? "bg-neutral-100" : "bg-neutral-700"} transition-colors duration-300`}
                         style={{
                             width: `${boardSizes.text1}px`,
                             height: `${boardSizes.text1}px`,
@@ -94,15 +102,18 @@ export default function Play(){
                         }}>
 
                         </div>
-                        <span className="transition-all duration-300" style={{
+                        <span className="transition-colors duration-300" style={{
                             fontSize: `${boardSizes.text1}px`,
                             opacity: gameState === "main" ? 1 : 0
                         }}>
                             {turn % 2 === 0 ? "WHITE" : "BLACK"} to move
                         </span>
-                        <button className="relative ml-4 hover:scale-[1.2] transition-all duration-300" style={{fontSize: `${boardSizes.text2}px`}}
+                        <button className={`relative ml-4 ${mode !== "white" && mode !== "black" ? "hover:scale-[1.2]" : "text-neutral-400"} 
+                        transition-colors duration-300`} style={{fontSize: `${boardSizes.text2}px`}}
                         onClick={() => {
-                            setFlipActive(prev => !prev)
+                            if(mode !== "white" && mode !== "black"){
+                                setFlipActive(prev => !prev)
+                            }
                         }}>
                             <PiArrowsDownUp/>
                             <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center transition-opacity"
@@ -114,13 +125,7 @@ export default function Play(){
                                 </div>
                             </div>
                         </button>
-                        <button className="ml-2 hover:scale-[1.2] transition-all duration-300" style={{fontSize: `${boardSizes.text2}px`}}
-                        onClick={() => {
-                            reset()
-                        }}>
-                            <HiOutlineRefresh/>
-                        </button>
-                        <button className="ml-2 hover:scale-[1.2] transition-all duration-300" style={{fontSize: `${boardSizes.text2}px`}}
+                        <button className="ml-2 hover:scale-[1.2] transition-colors duration-300" style={{fontSize: `${boardSizes.text2}px`}}
                         onClick={() => {
                             reset()
                             setGameState("start")
@@ -154,35 +159,92 @@ export default function Play(){
                                 style={{
                                     fontSize: boardSizes.text3
                                 }}>
-                                    Normal Chess
+                                    Chess
                                 </span>
                                 <div className="flex flex-col items-center"
                                 style={{
                                     gap: boardSizes.tileSize * 0.2,
                                     marginTop: boardSizes.tileSize * 0.2
                                 }}>
-                                    <button className="flex flex-row items-center justify-center border-2 
-                                    border-neutral-400 bg-neutral-200 text-neutral-400 hover:bg-neutral-200 cursor-not-allowed"
-                                    disabled={true}
-                                    onClick={() => {
-                                        reset()
-                                        setGameState("main")
+                                    <button className={`justify-center border-2 
+                                    border-neutral-400 bg-neutral-100 ${open ? "hover:bg-neutral-200" : "bg-neutral-200"}`}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOpen(prev => !prev)
                                     }}
                                     style={{
-                                        gap: boardSizes.tileSize * 0.1,
                                         fontSize: boardSizes.text1,
                                         width: boardSizes.tileSize * 4,
                                         height: boardSizes.text1 + boardSizes.tileSize * 0.25,
                                         maxHeight: boardSizes.text1 + boardSizes.tileSize * 0.25
                                     }}>
-                                        <MdComputer/>
-                                        Singleplayer
+                                        {!open ? 
+                                        <div className="flex flex-row w-full h-full items-center justify-center"
+                                        style={{
+                                            gap: boardSizes.tileSize * 0.1,
+                                        }}>
+                                            <MdComputer/>
+                                            Singleplayer
+                                        </div>:
+                                        <div className="flex flex-col w-full h-full items-center justify-center"
+                                        style={{
+                                            gap: boardSizes.tileSize * 0.1,
+                                        }}>
+                                            <div className="flex flex-row w-full h-full items-center justify-center"
+                                            style={{
+                                                gap: boardSizes.tileSize * 0.1,
+                                            }}>
+                                                <div className="bg-white border-[1px] border-neutral-700 hover:brightness-95"
+                                                style={{
+                                                    width: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                    height: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    reset()
+                                                    setMode("white")
+                                                    setGameState("main")
+                                                    setTurn(-1)
+                                                    setOpen(false)
+                                                }}/>
+                                                <div className="slash-bg border-[1px] border-neutral-700 hover:brightness-95"
+                                                style={{
+                                                    width: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                    height: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    reset()
+                                                    setMode(Math.random() > 0.5 ? "white" : "black")
+                                                    setGameState("main")
+                                                    setTurn(-1)
+                                                    setOpen(false)
+                                                }}/>
+                                                <div className="bg-neutral-800 border-[1px] border-neutral-700 hover:brightness-95"
+                                                style={{
+                                                    width: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                    height: boardSizes.tileSize * 0.25 + boardSizes.text1 * 0.4,
+                                                }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    reset()
+                                                    setMode("black")
+                                                    setGameState("main")
+                                                    setTurn(-1)
+                                                    setOpen(false)
+                                                }}/>
+                                            </div>
+                                        </div>
+                                        }
                                     </button>
                                     <button className="flex flex-row items-center justify-center border-2 
                                     border-neutral-400 bg-neutral-100 hover:bg-neutral-200"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                        e.stopPropagation()
                                         reset()
+                                        setMode("multi")
                                         setGameState("main")
+                                        setTurn(-1)
                                     }}
                                     style={{
                                         gap: boardSizes.tileSize * 0.1,

@@ -4,3 +4,7 @@
 
 .white-piece:hover{filter:contrast(0.5) brightness(1.15)}
 .black-piece:hover{filter:contrast(0.5) brightness(1.35)}
+.slash-bg{
+    background:linear-gradient(-135deg, rgb(38, 38, 38) 0%, rgb(38, 38, 38) 50%,
+    rgb(255, 255, 255) 50%, rgb(255, 255, 255) 100%)
+}
